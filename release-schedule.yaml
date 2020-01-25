@@ -1,0 +1,37 @@
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: flux-cron-<APP>
+  labels:
+    app: <APP>
+  namespace: flux
+spec:
+  # Schedules execute based on host time
+  # At the time of writing, nodes run 7 hours ahead of Boulder local time e.g. 7pm boulder = 2am node
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cron
+            image: sgryczan/flux-cron:0.0.0
+            env:
+            - name: FLUX_NS
+              value: flux
+            - name: APP_NS
+              value: <APP>
+            - name: WORKLOAD_NAME
+              value: deployment/<APP>
+            tty: true 
+            stdin: true
+            command:
+              - /bin/bash
+              - -c
+            args:
+              - '/usr/local/bin/fluxctl release --k8s-fwd-ns=$(FLUX_NS) -n $(APP_NS) --workload=$(WORKLOAD_NAME) --update-all-images --force || echo No updates'
+          serviceAccountName: flux
+          restartPolicy: Never
